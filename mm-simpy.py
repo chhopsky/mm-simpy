@@ -9,7 +9,7 @@ import random
 
 show_example_match = False
 enable_team_balancing = True
-enable_simple_sbmm = False
+enable_simple_sbmm = True
 player_pool_size = 10000
 
 def evaluate_player_for_match(player, params):
@@ -246,10 +246,11 @@ for i in range(simulations_to_run):
 
     total_elo_matches += (enemy_team_total + your_team_total) / 8
 
-print(f"predicted results:")
-print(f"balanced teams: {fair_matches}")
+print("friend suffering:")
 print(f"average match elo: {round(total_elo_matches / simulations_to_run)}")
-print(f"average friend below match elo: {round(total_elo_matches / simulations_to_run - your_friends_elo)}")
+print(f"amount worse than match average: {round(total_elo_matches / simulations_to_run - your_friends_elo)}")
+print(f"\npredicted results:")
+print(f"balanced teams: {fair_matches}")
 print(f"wins: {wins}")
 print(f"losses: {losses}")
 
