@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dynamic Player Distribution Histogram</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+      .bar {
+        fill: steelblue;
+      }
+      .bar.picked {
+        fill: green;
+      }
+      .bar.eliminated {
+        fill: red;
+      }
+      .bar.rejected {
+        fill: orange;
+      }
+      .bar.hover {
+        fill: lightblue;
+      }
+      .axis-label {
+        font: 12px sans-serif;
+      }
+    </style>
+  </head>
+  <body>
+    <svg id="histogram" width="800" height="500"></svg>
+    <script>
+      // D3 chart parameters
+      const width = 800;
+      const height = 500;
+      const margin = { top: 20, right: 30, bottom: 50, left: 40 };
+
+      const svg = d3.select("#histogram").attr("width", width).attr("height", height);
+
+      const x = d3
+        .scaleLinear()
+        .domain([1000, 2000]) // ELO range
+        .range([margin.left, width - margin.right]);
+
+      const y = d3.scaleLinear().range([height - margin.bottom, margin.top]);
+
+      // Add axes
+      const xAxis = svg
+        .append("g")
+        .attr("transform", `translate(0,${height - margin.bottom})`)
+        .call(d3.axisBottom(x))
+        .append("text")
+        .attr("x", width / 2)
+        .attr("y", 40)
+        .attr("fill", "black")
+        .attr("class", "axis-label")
+        .text("ELO Score");
+
+      const yAxis = svg.append("g").attr("transform", `translate(${margin.left},0)`);
+
+      yAxis
+        .append("text")
+        .attr("transform", "rotate(-90)")
+        .attr("x", -height / 2)
+        .attr("y", -30)
+        .attr("fill", "black")
+        .attr("class", "axis-label")
+        .text("Number of Players");
+
+      // Add a legend
+      const legend = svg.append("g").attr("transform", `translate(${width - 150},${margin.top})`);
+
+      legend
+        .append("rect")
+        .attr("x", 0)
+        .attr("y", 0)
+        .attr("width", 20)
+        .attr("height", 20)
+        .attr("fill", "green");
+      legend.append("text").attr("x", 30).attr("y", 15).text("Picked Players");
+
+      legend
+        .append("rect")
+        .attr("x", 0)
+        .attr("y", 30)
+        .attr("width", 20)
+        .attr("height", 20)
+        .attr("fill", "red");
+      legend.append("text").attr("x", 30).attr("y", 45).text("Eliminated Players");
+
+      legend
+        .append("rect")
+        .attr("x", 0)
+        .attr("y", 60)
+        .attr("width", 20)
+        .attr("height", 20)
+        .attr("fill", "orange");
+      legend.append("text").attr("x", 30).attr("y", 75).text("Rejected Players");
+
+      // Randomize API data
+      function generateRandomAPIResponse() {
+        const playerRecords = Array.from({ length: 7 }, () => {
+          const statusOptions = ["picked", "eliminated", "normal"];
+          return {
+            elo: Math.floor(Math.random() * (2000 - 1000) + 1000),
+            status: statusOptions[Math.floor(Math.random() * statusOptions.length)],
+          };
+        });
+
+        const rejectedPlayers = Array.from({ length: 2 }, () => ({
+          elo: Math.floor(Math.random() * (2000 - 1000) + 1000),
+          reason: "too high elo",
+        }));
+
+        return {
+          playerRecords,
+          rejectedPlayers,
+          fairMatches: Math.floor(Math.random() * 10),
+          expectedLosses: Math.floor(Math.random() * 5),
+          expectedWins: Math.floor(Math.random() * 5),
+          highEloPlayersOnYourTeam: Math.floor(Math.random() * 2),
+          highEloPlayersOnEnemyTeam: Math.floor(Math.random() * 2),
+          yourSufferingRating: Math.random() * 100,
+          partyMemberSufferingRating: Math.random() * 100,
+        };
+      }
+
+      // Function to prepare data for D3
+      function prepareDataForD3(jsonData) {
+        const playerData = [];
+
+        // Add normal players (picked, eliminated, or normal)
+        jsonData.playerRecords.forEach((player) => {
+          playerData.push({
+            elo: player.elo,
+            status: player.status,
+          });
+        });
+
+        // Add rejected players as well
+        jsonData.rejectedPlayers.forEach((rejectedPlayer) => {
+          playerData.push({
+            elo: rejectedPlayer.elo,
+            status: "rejected",
+          });
+        });
+
+        return playerData;
+      }
+
+      // Function to update the chart
+      function updateD3Chart(playerData) {
+        const bins = d3.bin().domain(x.domain()).thresholds(x.ticks(20))(
+          playerData.map((d) => d.elo)
+        );
+
+        y.domain([0, d3.max(bins, (d) => d.length)]).nice();
+
+        // Update Y-axis
+        yAxis.call(d3.axisLeft(y));
+
+        // Bind data to the bars
+        const bars = svg.selectAll(".bar").data(bins);
+
+        // Enter new bars
+        bars
+          .enter()
+          .append("rect")
+          .attr("class", (d) => {
+            const playersInBin = playerData.filter((p) => p.elo >= d.x0 && p.elo < d.x1);
+            if (playersInBin.some((p) => p.status === "picked")) return "bar picked";
+            if (playersInBin.some((p) => p.status === "eliminated")) return "bar eliminated";
+            if (playersInBin.some((p) => p.status === "rejected")) return "bar rejected";
+            return "bar";
+          })
+          .attr("x", (d) => x(d.x0) + 1)
+          .attr("y", height - margin.bottom)
+          .attr("width", (d) => Math.max(0, x(d.x1) - x(d.x0) - 1))
+          .attr("height", 0)
+          .merge(bars) // Merge with existing bars for update
+          .transition() // Smooth transition
+          .duration(500)
+          .attr("x", (d) => x(d.x0) + 1)
+          .attr("y", (d) => y(d.length))
+          .attr("width", (d) => Math.max(0, x(d.x1) - x(d.x0) - 1))
+          .attr("height", (d) => y(0) - y(d.length));
+
+        // Remove old bars
+        bars.exit().remove();
+      }
+
+      // Function to simulate API updates every second
+      setInterval(() => {
+        const apiResponse = generateRandomAPIResponse(); // Simulate fetching from an API
+        const playerData = prepareDataForD3(apiResponse); // Prepare the data for D3
+        updateD3Chart(playerData); // Update the D3 chart
+      }, 3000); // Update every 1 second
+    </script>
+  </body>
+</html>
