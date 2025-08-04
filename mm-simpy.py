@@ -11,7 +11,7 @@ enable_simple_sbmm = False
 player_pool_size = 10000
 debug = False
 
-# simulation match parameters
+# how many matches to simulate
 simulations_to_run = 100
 
 # player parameters 
@@ -30,7 +30,7 @@ acceptable_difference = 100
 # and how far above you we consider a player to be high elo
 high_elo_difference = 300
 
-# SBMM accept or reject
+# determines whether or not a player meets the parameters for the current match
 def evaluate_player_for_match(player, params):
     if player_pool[player] - sum_team(players) / len(players) + 1 < params["max_skill_difference"]:
         # print(f"player {player_pool[player]} + match avg {sum_team(players) / len(players) + 1} < {params['max_skill_difference']}")
